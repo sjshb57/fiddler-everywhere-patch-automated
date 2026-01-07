@@ -6,7 +6,7 @@ on:
       version_to_patch:
         description: 'The Version You Want to Patch'
         required: true
-        default: '6.0.0'
+        default: '7.0.0'
       os-and-arch:
         description: 'Operating System And Architecture'
         required: true
@@ -39,6 +39,10 @@ on:
         required: true
         default: 'Google'
 
+defaults:
+  run:
+    shell: pwsh
+
 env:
   OS_ARCH: ${{ github.event.inputs.os-and-arch }}
   VERSION_TO_PATCH: ${{ github.event.inputs.version_to_patch }}
@@ -52,60 +56,21 @@ env:
 jobs:
 
   validate-version:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     outputs:
       is_valid: ${{ steps.get_validity.outputs.is_valid }}
-
-    env:
-      NODE_JS_VERSION: 23.1.0
-
+      
     steps:
       - uses: actions/checkout@v4
       
-      - name: Use Node.js ${{ env.NODE_JS_VERSION }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_JS_VERSION }}
-          cache: 'npm'  # Auto-caches npm dependencies
-          cache-dependency-path: utils/fe-version-validator/package-lock.json
-
-      - name: Install Node.js dependencies
-        run: npm ci
-        working-directory: utils/fe-version-validator
-
-      - name: Run the Node.js script
-        run: node .
-        working-directory: utils/fe-version-validator
-
-      - name: Get Version Validity
+      - name: Validate Fiddler Version
         id: get_validity
-        shell: pwsh
+        working-directory: utils/fe-version-validator
         run: |
-          $filePath = "utils/fe-version-validator/versions.txt"
-          $isValid = 'false'
-          $patchingVersion = $env:VERSION_TO_PATCH
-          
-          if (-not [string]::IsNullOrEmpty($patchingVersion)) {
-            if (Select-String -Path $filePath -Pattern $patchingVersion) {
-              $compareVersion = "5.9.0"
-              
-              if ([version]$patchingVersion -ge [version]$compareVersion) {
-                $isValid = 'true'
-                Write-Output "Valid Version found."
-              } else {
-                Write-Output "Version not Compatible."
-              }
-            } else {
-              Write-Output "Version Empty."
-            }
-          } else {
-            Write-Output "Version not found in List!"
-          }
-          
-          echo "is_valid=$isValid" | Out-File -Append -FilePath $env:GITHUB_OUTPUT
+          ./Validate-FEVersion.ps1 -VersionToPatch $env:VERSION_TO_PATCH
 
   init_os_arch:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     outputs:
       library_extension:  ${{ steps.set_library_extension.outputs.library_extension }}
       arch_code:  ${{ steps.set_arch.outputs.arch_code }}
@@ -113,7 +78,6 @@ jobs:
     steps:
       - name: Set Library Extension (dll / so / dylib)
         id: set_library_extension
-        shell: pwsh
         run: |
           $extension = 'not-selected'
     
@@ -131,7 +95,6 @@ jobs:
 
       - name: Set Library Extension (dll / so / dylib)
         id: set_arch
-        shell: pwsh
         run: |
           $arch = 'not-selected'
     
@@ -152,7 +115,7 @@ jobs:
           "arch_code=$arch" | Out-File -Append -FilePath $env:GITHUB_OUTPUT
    
   download-Yui-patch:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: 
       - validate-version
       - init_os_arch
@@ -184,40 +147,37 @@ jobs:
               echo "IS_COMPATIBLE_CONT=false" | Out-File -Append -FilePath $env:GITHUB_ENV
           }
         
-        shell: pwsh
-
       - name: Set IS_COMPATIBLE_CONT as Output
         id: is-compatible-cont
-        run: echo "is-compatible-cont=${{ env.IS_COMPATIBLE_CONT }}" | Out-File -Append -FilePath $env:GITHUB_OUTPUT
+        run: echo "is-compatible-cont=${{ env.IS_COMPATIBLE_CONT }}" >> $env:GITHUB_OUTPUT
 
       - name: Set Yui name 
-        run: echo "YUI_NAME=yui" | Out-File -Append -FilePath $env:GITHUB_ENV
+        run: echo "YUI_NAME=yui" >> $env:GITHUB_ENV
         
       - name: Set Yui fiddler name (>= 5.17.0)
         if: env.IS_COMPATIBLE_CONT == 'true'
         run: |
-          echo "Yui_FIDDLER_NAME=fiddler.$env:LIBRARY_EXTENSION" | Out-File -Append -FilePath $env:GITHUB_ENV
-          echo "Yui_FIDDLER_NAME_NO_EXTENSION=fiddler" | Out-File -Append -FilePath $env:GITHUB_ENV
+          echo "Yui_FIDDLER_NAME=fiddler.$env:LIBRARY_EXTENSION" >> $env:GITHUB_ENV
+          echo "Yui_FIDDLER_NAME_NO_EXTENSION=fiddler" >> $env:GITHUB_ENV
 
       - name: Set Yui fiddler name (< 5.17.0 or on linux)
         if: env.IS_COMPATIBLE_CONT == 'false' || env.OS_ARCH == 'Linux (x86_64)'
         run: |
-          echo "Yui_FIDDLER_NAME=libfiddler.$env:LIBRARY_EXTENSION" | Out-File -Append -FilePath $env:GITHUB_ENV
-          echo "Yui_FIDDLER_NAME_NO_EXTENSION=libfiddler" | Out-File -Append -FilePath $env:GITHUB_ENV
+          echo "Yui_FIDDLER_NAME=libfiddler.$env:LIBRARY_EXTENSION" >> $env:GITHUB_ENV
+          echo "Yui_FIDDLER_NAME_NO_EXTENSION=libfiddler" >> $env:GITHUB_ENV
 
       - name: Set Yui_FIDDLER_NAME as Output
         id: Yui-fiddler-name
-        run: echo "Yui-fiddler-name=${{ env.Yui_FIDDLER_NAME }}" | Out-File -Append -FilePath $env:GITHUB_OUTPUT
+        run: echo "Yui-fiddler-name=${{ env.Yui_FIDDLER_NAME }}" >> $env:GITHUB_OUTPUT
 
       - name: Create Yui directory
         run: |
           if (-Not (Test-Path "Yui")) {
             New-Item -ItemType Directory -Path "Yui"
           }
-        shell: pwsh
 
       - name: Set Yui Release
-        run: echo "Yui_RELEASE=continuous" | Out-File -Append -FilePath $env:GITHUB_ENV
+        run: echo "Yui_RELEASE=continuous" >> $env:GITHUB_ENV   
         
       - name: Download Yui Patch
         run: |
@@ -238,7 +198,6 @@ jobs:
             Write-Error "Failed to download the patch files. Error details: $_"
             exit 1
           }
-        shell: pwsh
       
       - name: Upload Yui folder as an artifact
         uses: actions/upload-artifact@v4
@@ -248,7 +207,7 @@ jobs:
           if-no-files-found: error
 
   download-msojocs-server:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     if: ${{ needs.validate-version.outputs.is_valid }} == 'true'
 
@@ -261,13 +220,13 @@ jobs:
 
       - name: Configure sparse-checkout to download the server directory
         run: |
-          echo "server" | Out-File -Append -FilePath .git\info\sparse-checkout
+          Set-Content -Path ".git/info/sparse-checkout" -Value "server"
           git pull origin main
 
       - name: Move the downloaded directory to the target folder
         run: |
           mkdir -p msojocs
-          Move-Item -Path server -Destination msojocs/
+          Move-Item -Path "server" -Destination "msojocs/"
 
       - name: List files in the msojocs/server directory
         run: Get-ChildItem -Path msojocs\server
@@ -281,7 +240,7 @@ jobs:
 
   download-fiddler-everywhere-windows:
     if: ${{ github.event.inputs.os-and-arch == 'Windows (x86_64)' }}
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: 
       - validate-version
 
@@ -303,14 +262,12 @@ jobs:
             Write-Host "PATCHING_VERSION is empty or not set"
             exit 1
           }
-        shell: pwsh
 
       - name: Extract exe 
         run: 7z x "FiddlerEverywhereSetup.exe" -ofe_extracted
 
       - name: Extract app
         run: 7z x "fe_extracted/`$PLUGINSDIR/app-64.7z" -ofe_app
-        shell: pwsh
         
       - name: Upload Fiddler Everywhere Extracted folder as an artifact
         uses: actions/upload-artifact@v4
@@ -343,7 +300,6 @@ jobs:
             Write-Host "VERSION_TO_PATCH is empty or not set"
             exit 1
           }
-        shell: pwsh
 
       - name: Extract AppImage 
         run: |
@@ -397,7 +353,6 @@ jobs:
             Write-Host "VERSION_TO_PATCH is empty or not set"
             exit 1
           }
-        shell: pwsh
 
       - name: Extract AppImage 
         run: |
@@ -405,7 +360,6 @@ jobs:
           cp -R /Volumes/FiddlerEverywhere/* ./fe_app/
 
       - name: List fe_app
-        shell: pwsh
         run: Get-ChildItem -Recurse
         
       - name: Upload Fiddler Everywhere Extracted folder as an artifact
@@ -454,7 +408,6 @@ jobs:
           Get-ChildItem -Recurse Yui-patch
           Get-ChildItem -Recurse msojocs-patch
           Get-ChildItem -Recurse fe_app
-        shell: pwsh
 
       - name: Rename main FE folder
         run: Rename-Item -Path "fe_app" -NewName "FE"
@@ -470,7 +423,6 @@ jobs:
           } else {
             Write-Host "fiddler / libfiddler or Yui patch not found"
           }
-        shell: pwsh
 
       - name: Clean Yui-patch
         run: |
@@ -490,7 +442,6 @@ jobs:
           } else {
             Write-Host "Source Server Folder not found"
           }
-        shell: pwsh
 
       - name: Set patch server port (in main.js of server)
         run: |

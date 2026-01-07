@@ -5,7 +5,7 @@ Guides you to Patch Fiddler Everywhere on Windows Automatically.
 > Parent Repo: https://github.com/msojocs/fiddler-everywhere-enhance
 
 ## What and How?
-This's a  a patch for Telerik Fiddler Everywhere. It can grant you a trial that doesn't expire. The trial has every feature. 
+This's a  a patch for Telerik Fiddler Everywhere. It can grant you a trial that doesn't expire. The trial has all the features. 
 This's the guide for applying patch automatically. 
 
 ![Unlimited Trial](https://github.com/user-attachments/assets/e9c83778-27fa-456a-96e6-07bb0cd7f4ad)
@@ -13,6 +13,14 @@ This's the guide for applying patch automatically.
 ---
 
 ## Feature Updates
+> [!TIP]
+> Patching is even faster.
+>  - Previously &nbsp;&nbsp;&nbsp;:&nbsp;2m 25s
+>  - Now &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp;1m 30s
+
+> [!IMPORTANT]
+> If you encounter an issue of "Fiddle Everywhere Crashing in Startup", you can follow [this](#fiddler-everywhere-crashing-at-startup).
+
 > [!TIP]
 > Now supports changing patch server port (Useful if port conflitcts encountered)
 
@@ -108,3 +116,33 @@ This's the guide for applying patch automatically.
 
 > [!CAUTION]
 > Please don't use this patch for illegal matters. And we'd love if you can buy and support the officials: [Please Support](https://www.telerik.com/purchase/fiddler)
+
+---
+
+### Fiddler Everywhere Crashing at Startup
+
+If you encounter this issue, it's most likely unrelated to the patch! You should confirm it!
+
+- Check logs by running `Fiddler Everywhere.exe` from the terminal.
+  Pay special attention to the following line. (it’s omitted in the official, non-patched version of Fiddler Everywhere.)
+  ```bash
+  Server error log during start: System.IO.IOException: Failed to bind to address http://localhost:8868.
+  ```
+
+  If you see this, it's completely unrelated to the patch. You should see the same issue with the `non-patched official FE`. Confirm this. 
+
+- Check Fiddler Everywhere logs in `%AppData%\Fiddler Everywhere\logs\`
+
+- Check `Administered port exclusions` to see if port `8868` is restricted. 
+You can check it with:
+  ```bash
+  netsh interface ipv4 show excludedportrange protocol=tcp
+  ```
+
+- If port `8868` is restricted, 
+  - You should also see the same issue with the `non-patched official FE`. Confirm this.
+  - You can try removing port `8868` from `Administered port exclusions`. 
+
+You should also follow issue [#44](https://github.com/auto-yui-patch/fiddler-everywhere-patch-automated/issues/44#issuecomment-3497425472) ; Special tnx to [@choneas](https://github.com/choneas). 
+
+If this didn't solve your problem, feel free to open an issue. 
