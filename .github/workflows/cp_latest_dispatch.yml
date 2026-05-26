@@ -35,6 +35,14 @@ on:
         description: 'Fake registered provider (for fake FE account) ; Ex: Google'
         required: true
         default: 'Google'
+      patch-language:
+        description: 'Enable Chinese UI'
+        required: true
+        type: choice
+        default: 'No'
+        options:
+          - 'No'
+          - 'Yes (Ctrl+T to toggle)'
 
 defaults:
   run:
@@ -48,6 +56,7 @@ env:
   PATCH_USER_LNAME: ${{ github.event.inputs.patch-user-lastName }}
   PATCH_USER_COUNTRYCODE: ${{ github.event.inputs.patch-user-country-code }}
   PATCH_USER_PROVIDER: ${{ github.event.inputs.patch-user-provider }}
+  PATCH_LANGUAGE: ${{ github.event.inputs.patch-language }}
 
 jobs:
   init_os_arch:
@@ -102,7 +111,7 @@ jobs:
       scraped_version: ${{ steps.get_version.outputs.scraped_version }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Run the Powershell script
         id: get_version
@@ -195,7 +204,7 @@ jobs:
           }
       
       - name: Upload Yui folder as an artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Yui-patch
           path: Yui/
@@ -225,7 +234,7 @@ jobs:
         run: Get-ChildItem -Path msojocs\server
 
       - name: Upload msojocs folder as an artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: msojocs-patch
           path: msojocs/
@@ -263,7 +272,7 @@ jobs:
         run: 7z x "fe_extracted/`$PLUGINSDIR/app-64.7z" -ofe_app
         
       - name: Upload Fiddler Everywhere Extracted folder as an artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fe_app
           path: fe_app/
@@ -303,7 +312,7 @@ jobs:
         run: mv squashfs-root fe_app
         
       - name: Upload Fiddler Everywhere Extracted folder as an artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fe_app
           path: fe_app/
@@ -356,7 +365,7 @@ jobs:
         run: Get-ChildItem -Recurse
         
       - name: Upload Fiddler Everywhere Extracted folder as an artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fe_app
           path: fe_app/
@@ -382,19 +391,19 @@ jobs:
       
     steps:
       - name: Download Yukuhana-Patch
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: Yui-patch
           path: Yui-patch
 
       - name: Download msojocs-Server
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: msojocs-patch
           path: msojocs-patch
 
       - name: Download FE
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: fe_app
           path: fe_app
@@ -432,11 +441,24 @@ jobs:
         run: |
           $source_server_folder = "msojocs-patch/server/file"
           $destination_server_folder = "FE/resources/app/out"
-          
+
           if (Test-Path $source_server_folder) {
             Copy-Item -Path $source_server_folder -Destination $destination_server_folder -Recurse
           } else {
             Write-Host "Source Server Folder not found"
+          }
+
+      - name: Enable Chinese translation
+        if: startsWith(env.PATCH_LANGUAGE, 'Yes')
+        run: |
+          $translate_js = "msojocs-patch/server/translate.js"
+          $dest_translate = "FE/resources/app/out/translate.js"
+
+          if (Test-Path $translate_js) {
+            Copy-Item -Path $translate_js -Destination $dest_translate -Force
+            Write-Host "translate.js copied, Chinese language enabled (Ctrl+T to switch)"
+          } else {
+            Write-Host "translate.js not found in server directory"
           }
 
       - name: Set patch server port (in main.js of server)
@@ -507,7 +529,7 @@ jobs:
           }
 
       - name: Upload Artifact for Patched FE
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: "${{ steps.rename-fe.outputs.patched-fe-name }}"
           path: "${{ steps.rename-fe.outputs.patched-fe-name }}/"
